@@ -1,90 +1,164 @@
+// importing promise-based file system methods
 const { readFile, appendFile, writeFile } = require("fs/promises");
-const { exit } = require("process");
 
-const command = process.argv[2];
-const name = process.argv[3];
-const file = "student.txt";
+const command = process.argv[2]; // command from CLI (add, list, count, remove)
+const name = process.argv[3]; // student name from CLI
+const file = "student.txt"; // file to store student names
 
-//creating helper functions
-
-//list command
+// ======================= LIST ALL STUDENTS =======================
 async function listAll() {
   try {
-    const data = await readFile(file, "utf-8");
-    if (!data) throw new Error("File not availabe");
+    // try to read file
+    let data = "";
 
-    console.log(data ? data : []);
+    try {
+      data = await readFile(file, "utf-8");
+    } catch (err) {
+      // if file doesn't exist, treat as empty (not an error)
+      if (err.code !== "ENOENT") throw err;
+    }
+
+    // convert file content into array
+    const students = data
+      ? data
+          .trim()
+          .split("\n")
+          .filter((n) => n)
+      : [];
+
+    console.log("   Registered Students   ");
+    console.log("--------------------------");
+
+    // check if list is empty
+    if (students.length === 0) {
+      console.log("No students found.");
+      return;
+    }
+
+    // print students nicely
+    students.forEach((s, i) => {
+      console.log(`${i + 1}. ${s}`);
+    });
   } catch (err) {
-    console.log("Error: ", err.message);
+    console.log("Error:", err.message);
   } finally {
     console.log("Process done");
   }
 }
 
-//adding student
+// ======================= ADD STUDENT =======================
 async function addingStudent() {
-  try {
-    //read file
-    const data = await readFile(file, "utf-8");
+  // validate input
+  if (!name) {
+    console.log("Please provide a student name.");
+    return;
+  }
 
-    //loop through file to get available student
-    const availableStudent = data ? data.trim().split("\n") : "";
-    //check if new student is inside
-    const isExist = availableStudent.includes(name);
-    if (isExist) {
-      throw new Error(`Student with name ${name} already exist in file`);
+  try {
+    let data = "";
+
+    try {
+      data = await readFile(file, "utf-8");
+    } catch (err) {
+      if (err.code !== "ENOENT") throw err;
     }
-    //add student to list
+
+    // get existing students
+    const students = data
+      ? data
+          .trim()
+          .split("\n")
+          .filter((n) => n)
+      : [];
+
+    // check if student already exists
+    if (students.includes(name)) {
+      console.log(`Student ${name} already exists.`);
+      return;
+    }
+
+    // add new student
     await appendFile(file, `${name}\n`);
-    console.log(`Student with name ${name} Added`);
+    console.log(`Student ${name} added successfully`);
   } catch (err) {
-    console.log("Error: ", err.message);
+    console.log("Error:", err.message);
   } finally {
     console.log("DONE!!!");
   }
 }
-//count students
+
+// ======================= COUNT STUDENTS =======================
 async function countStudent() {
   try {
-    //read student file
-    const data = await readFile(file, "utf-8");
-    if (!data) throw new Error("File not availabe");
-    //convert to list and check lemght as coundt
-    const totalStudent = data ? data.trim().split("\n").length : [];
-    console.log(`Regstered Student(s): ${totalStudent}`);
+    let data = "";
+
+    try {
+      data = await readFile(file, "utf-8");
+    } catch (err) {
+      if (err.code !== "ENOENT") throw err;
+    }
+
+    // convert to array
+    const students = data
+      ? data
+          .trim()
+          .split("\n")
+          .filter((n) => n)
+      : [];
+
+    console.log(`Registered Student(s): ${students.length}`);
   } catch (err) {
-    console.log("Error: ", err.message);
+    console.log("Error:", err.message);
   } finally {
     console.log("Process done");
   }
 }
 
-//removing a student
+// ======================= REMOVE STUDENT =======================
 async function removeStudent() {
-  try {
-    //read file
-    const data = await readFile(file, "utf-8");
+  // validate input
+  if (!name) {
+    console.log("Please provide a student name.");
+    return;
+  }
 
-    //view all students
-    const allStudents = data ? data.trim().split("\n") : [];
-    //check if name exist
-    const isExist = allStudents.includes(name);
-    if (isExist) {
-      //filter student except name
-      const newData = allStudents.filter((n) => n !== name).join("\n");
-      //write overwrite file with new data
-      await writeFile(file, `${newData}\n`);
-      console.log(`Student with name ${name} has successfully been removed`);
-    } else {
-      throw new Error(`${name} doesn't exist in file...`);
+  try {
+    let data = "";
+
+    try {
+      data = await readFile(file, "utf-8");
+    } catch (err) {
+      if (err.code !== "ENOENT") throw err;
     }
+
+    // get all students
+    const students = data
+      ? data
+          .trim()
+          .split("\n")
+          .filter((n) => n)
+      : [];
+
+    // check if student exists
+    if (!students.includes(name)) {
+      console.log(`${name} does not exist in the file.`);
+      return;
+    }
+
+    // remove student
+    const newData = students.filter((n) => n !== name).join("\n");
+
+    // overwrite file with updated list
+    await writeFile(file, newData + (newData ? "\n" : ""));
+    console.log(`Student ${name} has been removed successfully`);
   } catch (err) {
-    console.log("Error: ", err.message);
+    console.log("Error:", err.message);
   } finally {
     console.log("Done Removing Student");
   }
 }
 
+// ======================= COMMAND HANDLER =======================
 if (command === "list") {
   listAll();
 } else if (command === "add") {
