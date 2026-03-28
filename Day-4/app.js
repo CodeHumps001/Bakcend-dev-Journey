@@ -1,46 +1,44 @@
 require("dotenv").config();
-const studentRoutes = require("./routes/studentRoutes");
-const authRoutes = require("./routes/authRoutes");
-const attendanceRoutes = require("./routes/attendanceRoutes");
 const express = require("express");
 const app = express();
 
-//logger
+// Routes
+const authRoutes = require("./routes/authRoutes");
+const studentRoutes = require("./routes/studentRoutes");
+const courseRoutes = require("./routes/courseRoutes");
+const attendanceRoutes = require("./routes/attendanceRoutes");
+
+// Logger middleware
 app.use((req, res, next) => {
   res.on("finish", () => {
     console.log(
-      `[${new Date().toISOString()}]  ${req.method} ${req.url} - ${res.statusCode}`,
+      `[${new Date().toISOString()}] ${req.method} ${req.url} - ${res.statusCode}`,
     );
   });
   next();
 });
 
-//middleware to parse json body
+// Body parser
 app.use(express.json());
 
+// Mount routes
+app.use("/api/auth", authRoutes);
 app.use("/api/students", studentRoutes);
-app.use("/auth/", authRoutes);
+app.use("/api/courses", courseRoutes);
 app.use("/api/attendance", attendanceRoutes);
 
-app.get("/", (req, res) => {
-  res.json({ message: "Hello welcome to geoAttend" });
-  console.log("Welcome t0 geoattend");
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ error: "Route not found" });
 });
 
-//error to catch all unknow routes
-app.use((req, res, next) => {
-  res.status(404).json({ error: "Routes not found" });
-  console.log("Unknow routes");
-});
-
-//error handling
+// Error handler
 app.use((err, req, res, next) => {
   console.error("Error:", err.message);
   res.status(500).json({ error: "Something went wrong on the server" });
 });
 
-//listen app
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log("hey app  is running on post", PORT);
+  console.log(`GeoAttend API running on port ${PORT}`);
 });
