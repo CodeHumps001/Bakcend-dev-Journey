@@ -1,5 +1,6 @@
 const prisma = require("../prisma/client");
 const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 
 // ─── REGISTER ────────────────────────────────────────
 const register = async (req, res, next) => {
@@ -109,10 +110,26 @@ const login = async (req, res, next) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
+    // Create the JWT token
+    // jwt.sign() takes three arguments:
+    // 1. The payload — data to store inside the token
+    // 2. The secret key — used to sign the token
+    // 3. Options — like when the token expires
+    const token = jwt.sign(
+      {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN },
+    );
+
     const { password: _, ...userWithoutPassword } = user;
 
     res.status(200).json({
       message: "Login successful",
+      token,
       user: userWithoutPassword,
     });
   } catch (err) {
@@ -120,4 +137,31 @@ const login = async (req, res, next) => {
   }
 };
 
-module.exports = { register, login };
+const getMe = async (req, res, next) => {
+  try {
+    // req.user.id comes from the JWT token payload
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        // include profile based on role
+        student: true,
+        lecturer: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({ user });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { register, login, getMe };

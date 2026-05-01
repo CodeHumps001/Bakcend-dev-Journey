@@ -1,5 +1,7 @@
 const express = require("express");
 const router = express.Router();
+const authenticate = require("../middleware/authenticate");
+const authorize = require("../middleware/authorize");
 const {
   getAllStudents,
   getStudentById,
@@ -8,12 +10,16 @@ const {
   getAttendancePercentage,
 } = require("../controllers/studentController");
 
-// specific routes MUST come before dynamic routes
-// otherwise /department/CS would match /:id with id = "department"
-router.get("/department/:department", getStudentsByDepartment);
-router.get("/:id/attendance/:courseId", getAttendancePercentage);
-router.get("/:id", getStudentById);
-router.get("/", getAllStudents);
-router.delete("/:id", deleteStudent);
+// authenticate — must be logged in
+// authorize — only these roles can access
+
+// Any logged in user can view students
+router.get("/", authenticate, getAllStudents);
+router.get("/department/:department", authenticate, getStudentsByDepartment);
+router.get("/:id", authenticate, getStudentById);
+router.get("/:id/attendance/:courseId", authenticate, getAttendancePercentage);
+
+// Only admins can delete students
+router.delete("/:id", authenticate, authorize("ADMIN"), deleteStudent);
 
 module.exports = router;
