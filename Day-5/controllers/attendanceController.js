@@ -1,4 +1,6 @@
 const prisma = require("../prisma/client");
+const { sendSuccess } = require("../utils/response");
+const AppError = require("../utils/AppError");
 
 // ─── HAVERSINE FORMULA ───────────────────────────────
 // This function calculates the real-world distance in metres
@@ -37,10 +39,10 @@ const startSession = async (req, res, next) => {
       req.body;
 
     if (!courseId || !startTime || !endTime || !latitude || !longitude) {
-      return res.status(400).json({
-        error:
-          "courseId, startTime, endTime, latitude and longitude are required",
-      });
+      throw new AppError(
+        "courseId, startTime, endTime, latitude and longitude are required",
+        400,
+      );
     }
 
     // Check course exists
@@ -48,7 +50,7 @@ const startSession = async (req, res, next) => {
       where: { id: Number(courseId) },
     });
     if (!course) {
-      return res.status(404).json({ error: "Course not found" });
+      throw new AppError("Course not found", 404);
     }
 
     const session = await prisma.session.create({
@@ -63,10 +65,7 @@ const startSession = async (req, res, next) => {
       },
     });
 
-    res.status(201).json({
-      message: "Session started successfully",
-      session,
-    });
+    return sendSuccess(res, "Session started successfully", { session }, 201);
   } catch (err) {
     next(err);
   }
@@ -81,9 +80,10 @@ const markAttendance = async (req, res, next) => {
     const { studentId, sessionId, latitude, longitude } = req.body;
 
     if (!studentId || !sessionId || !latitude || !longitude) {
-      return res.status(400).json({
-        error: "studentId, sessionId, latitude and longitude are required",
-      });
+      throw new AppError(
+        "studentId, sessionId, latitude and longitude are required",
+        400,
+      );
     }
 
     // Check session exists
@@ -91,7 +91,7 @@ const markAttendance = async (req, res, next) => {
       where: { id: Number(sessionId) },
     });
     if (!session) {
-      return res.status(404).json({ error: "Session not found" });
+      throw new AppError("Session not found", 404);
     }
 
     // Check student exists
@@ -99,7 +99,7 @@ const markAttendance = async (req, res, next) => {
       where: { id: Number(studentId) },
     });
     if (!student) {
-      return res.status(404).json({ error: "Student not found" });
+      throw new AppError("Student not found", 404);
     }
 
     // Check if attendance already marked for this session
@@ -110,9 +110,7 @@ const markAttendance = async (req, res, next) => {
       },
     });
     if (existing) {
-      return res.status(409).json({
-        error: "Attendance already marked for this session",
-      });
+      throw new AppError("Attendance already marked for this session", 409);
     }
 
     // Calculate distance between student and classroom
@@ -137,16 +135,22 @@ const markAttendance = async (req, res, next) => {
       },
     });
 
-    res.status(201).json({
-      message:
-        status === "PRESENT"
-          ? "✅ Attendance marked — you are present"
-          : "❌ You are too far from the classroom",
-      status,
-      distanceFromClass: `${Math.round(distance)} metres`,
-      allowedRadius: `${session.radiusMeters} metres`,
-      attendance,
-    });
+    const message =
+      status === "PRESENT"
+        ? "✅ Attendance marked — you are present"
+        : "❌ You are too far from the classroom";
+
+    return sendSuccess(
+      res,
+      message,
+      {
+        status,
+        distanceFromClass: `${Math.round(distance)} metres`,
+        allowedRadius: `${session.radiusMeters} metres`,
+        attendance,
+      },
+      201,
+    );
   } catch (err) {
     next(err);
   }
@@ -163,7 +167,7 @@ const getSessionAttendance = async (req, res, next) => {
       where: { id: Number(sessionId) },
     });
     if (!session) {
-      return res.status(404).json({ error: "Session not found" });
+      throw new AppError("Session not found", 404);
     }
 
     const records = await prisma.attendance.findMany({
@@ -177,7 +181,7 @@ const getSessionAttendance = async (req, res, next) => {
       },
     });
 
-    res.json({
+    return sendSuccess(res, "Attendance retrieved successfully", {
       sessionId: Number(sessionId),
       count: records.length,
       records,

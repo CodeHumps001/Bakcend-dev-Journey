@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const AppError = require("../utils/AppError");
 
 // This middleware runs BEFORE the route handler
 // It checks if the request has a valid token
@@ -14,16 +15,12 @@ const authenticate = (req, res, next) => {
 
   // Check if Authorization header exists
   if (!authHeader) {
-    return res.status(401).json({
-      error: "Access denied. No token provided.",
-    });
+    throw new AppError("Access denied. No token provided.", 401);
   }
 
   // Check if it follows the "Bearer TOKEN" format
   if (!authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({
-      error: "Invalid token format. Use: Bearer <token>",
-    });
+    throw new AppError("Invalid token format. Use: Bearer <token>", 401);
   }
 
   // Extract just the token — split by space and take index 1
@@ -46,11 +43,9 @@ const authenticate = (req, res, next) => {
     // jwt.verify() throws JsonWebTokenError if token is invalid
     // and TokenExpiredError if token has expired
     if (err.name === "TokenExpiredError") {
-      return res
-        .status(401)
-        .json({ error: "Token has expired. Please login again." });
+      throw new AppError("Token has expired. Please login again.", 401);
     }
-    return res.status(401).json({ error: "Invalid token." });
+    throw new AppError("Invalid token.", 401);
   }
 };
 

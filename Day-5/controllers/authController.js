@@ -1,19 +1,20 @@
 const prisma = require("../prisma/client");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const { sendSuccess, sendError } = require("../utils/response");
+const { sendSuccess } = require("../utils/response");
+const AppError = require("../utils/AppError");
 
 const register = async (req, res, next) => {
   try {
     const { name, email, password, role } = req.body;
 
     if (!name || !email || !password || !role) {
-      return sendError(res, "All fields are required", 400);
+      throw new AppError("All fields are required", 400);
     }
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
-      return sendError(res, "Email already exists", 409);
+      throw new AppError("Email already exists", 409);
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -25,8 +26,7 @@ const register = async (req, res, next) => {
       const { studentCode, department, level } = req.body;
       if (!studentCode || !department || !level) {
         await prisma.user.delete({ where: { id: user.id } });
-        return sendError(
-          res,
+        throw new AppError(
           "studentCode, department and level are required for students",
           400,
         );
@@ -45,8 +45,7 @@ const register = async (req, res, next) => {
       const { staffCode, department } = req.body;
       if (!staffCode || !department) {
         await prisma.user.delete({ where: { id: user.id } });
-        return sendError(
-          res,
+        throw new AppError(
           "staffCode and department are required for lecturers",
           400,
         );
@@ -73,17 +72,17 @@ const login = async (req, res, next) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return sendError(res, "Email and password are required", 400);
+      throw new AppError("Email and password are required", 400);
     }
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      return sendError(res, "Invalid credentials", 401);
+      throw new AppError("Invalid credentials", 401);
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return sendError(res, "Invalid credentials", 401);
+      throw new AppError("Invalid credentials", 401);
     }
 
     const token = jwt.sign(
@@ -118,7 +117,7 @@ const getMe = async (req, res, next) => {
     });
 
     if (!user) {
-      return sendError(res, "User not found", 404);
+      throw new AppError("User not found", 404);
     }
 
     return sendSuccess(res, "Profile retrieved successfully", { user });

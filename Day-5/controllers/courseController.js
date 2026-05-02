@@ -1,4 +1,6 @@
 const prisma = require("../prisma/client");
+const { sendSuccess } = require("../utils/response");
+const AppError = require("../utils/AppError");
 
 // ─── CREATE COURSE ───────────────────────────────────
 const createCourse = async (req, res, next) => {
@@ -6,15 +8,13 @@ const createCourse = async (req, res, next) => {
     const { code, name, department, semester, lecturerId } = req.body;
 
     if (!code || !name || !department || !semester || !lecturerId) {
-      return res.status(400).json({ error: "All fields are required" });
+      throw new AppError("All fields are required", 400);
     }
 
     // Check if course code already exists
     const existing = await prisma.course.findUnique({ where: { code } });
     if (existing) {
-      return res.status(409).json({
-        error: `Course with code ${code} already exists`,
-      });
+      throw new AppError(`Course with code ${code} already exists`, 409);
     }
 
     const course = await prisma.course.create({
@@ -27,7 +27,7 @@ const createCourse = async (req, res, next) => {
       },
     });
 
-    res.status(201).json({ message: "Course created successfully", course });
+    return sendSuccess(res, "Course created successfully", { course }, 201);
   } catch (err) {
     next(err);
   }
@@ -47,7 +47,10 @@ const getAllCourses = async (req, res, next) => {
       },
     });
 
-    res.json({ count: courses.length, courses });
+    return sendSuccess(res, "Courses retrieved successfully", {
+      count: courses.length,
+      courses,
+    });
   } catch (err) {
     next(err);
   }
@@ -80,12 +83,10 @@ const getCourseById = async (req, res, next) => {
     });
 
     if (!course) {
-      return res.status(404).json({
-        error: `Course with id ${id} not found`,
-      });
+      throw new AppError(`Course with id ${id} not found`, 404);
     }
 
-    res.json({ course });
+    return sendSuccess(res, "Course retrieved successfully", { course });
   } catch (err) {
     next(err);
   }
@@ -97,9 +98,7 @@ const enrollStudent = async (req, res, next) => {
     const { studentId, courseId } = req.body;
 
     if (!studentId || !courseId) {
-      return res.status(400).json({
-        error: "studentId and courseId are required",
-      });
+      throw new AppError("studentId and courseId are required", 400);
     }
 
     // Check if student exists
@@ -107,7 +106,7 @@ const enrollStudent = async (req, res, next) => {
       where: { id: Number(studentId) },
     });
     if (!student) {
-      return res.status(404).json({ error: "Student not found" });
+      throw new AppError("Student not found", 404);
     }
 
     // Check if course exists
@@ -115,7 +114,7 @@ const enrollStudent = async (req, res, next) => {
       where: { id: Number(courseId) },
     });
     if (!course) {
-      return res.status(404).json({ error: "Course not found" });
+      throw new AppError("Course not found", 404);
     }
 
     // Check if already enrolled
@@ -128,9 +127,7 @@ const enrollStudent = async (req, res, next) => {
     });
 
     if (existing) {
-      return res.status(409).json({
-        error: "Student is already enrolled in this course",
-      });
+      throw new AppError("Student is already enrolled in this course", 409);
     }
 
     const enrollment = await prisma.enrollment.create({
@@ -140,10 +137,12 @@ const enrollStudent = async (req, res, next) => {
       },
     });
 
-    res.status(201).json({
-      message: "Student enrolled successfully",
-      enrollment,
-    });
+    return sendSuccess(
+      res,
+      "Student enrolled successfully",
+      { enrollment },
+      201,
+    );
   } catch (err) {
     next(err);
   }

@@ -1,9 +1,9 @@
-const { sendError } = require("../utils/response");
+const AppError = require("../utils/AppError");
 const validate = (schema) => {
   return (req, res, next) => {
     // 1. Ensure req.body exists (prevents crashes if body-parser is missing)
     if (!req.body) {
-      return sendError(res, "Request body is missing", 400);
+      throw new AppError("Request body is missing", 400);
     }
 
     const result = schema.safeParse(req.body);
@@ -20,7 +20,7 @@ const validate = (schema) => {
         errors[field] = err.message;
       });
 
-      return sendError(res, "Validation failed", 400, errors);
+      throw new AppError("Validation failed", 400);
     }
 
     req.body = result.data;

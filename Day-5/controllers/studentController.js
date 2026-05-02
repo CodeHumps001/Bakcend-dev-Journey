@@ -1,5 +1,6 @@
 const prisma = require("../prisma/client");
-const { sendSuccess, sendError } = require("../utils/response");
+const { sendSuccess } = require("../utils/response");
+const AppError = require("../utils/AppError");
 
 const getAllStudents = async (req, res, next) => {
   try {
@@ -58,7 +59,7 @@ const getStudentById = async (req, res, next) => {
     });
 
     if (!student) {
-      return sendError(res, `Student with id ${id} not found`, 404);
+      throw new AppError(`Student with id ${id} not found`, 404);
     }
 
     return sendSuccess(res, "Student retrieved successfully", { student });
@@ -80,11 +81,7 @@ const getStudentsByDepartment = async (req, res, next) => {
     });
 
     if (students.length === 0) {
-      return sendError(
-        res,
-        `No students found in ${department} department`,
-        404,
-      );
+      throw new AppError(`No students found in ${department} department`, 404);
     }
 
     return sendSuccess(res, "Students retrieved successfully", {
@@ -105,7 +102,7 @@ const deleteStudent = async (req, res, next) => {
     });
 
     if (!student) {
-      return sendError(res, `Student with id ${id} not found`, 404);
+      throw new AppError(`Student with id ${id} not found`, 404);
     }
 
     await prisma.student.delete({ where: { id: Number(id) } });
@@ -126,7 +123,7 @@ const getAttendancePercentage = async (req, res, next) => {
     });
 
     if (totalSessions === 0) {
-      return sendError(res, "No sessions found for this course yet", 404);
+      throw new AppError("No sessions found for this course yet", 404);
     }
 
     const attended = await prisma.attendance.count({
