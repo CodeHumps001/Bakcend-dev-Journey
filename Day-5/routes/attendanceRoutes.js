@@ -2,24 +2,31 @@ const express = require("express");
 const router = express.Router();
 const authenticate = require("../middleware/authenticate");
 const authorize = require("../middleware/authorize");
+const validate = require("../middleware/validate");
+const {
+  startSessionSchema,
+  markAttendanceSchema,
+} = require("../utils/validators");
 const {
   startSession,
   markAttendance,
   getSessionAttendance,
 } = require("../controllers/attendanceController");
 
-// Only lecturers can start sessions
 router.post(
   "/session",
   authenticate,
   authorize("LECTURER", "ADMIN"),
+  validate(startSessionSchema),
   startSession,
 );
-
-// Only students can mark attendance
-router.post("/mark", authenticate, authorize("STUDENT"), markAttendance);
-
-// Any logged in user can view attendance
+router.post(
+  "/mark",
+  authenticate,
+  authorize("STUDENT"),
+  validate(markAttendanceSchema),
+  markAttendance,
+);
 router.get("/session/:sessionId", authenticate, getSessionAttendance);
 
 module.exports = router;

@@ -1,68 +1,78 @@
 const prisma = require("../prisma/client");
+const { sendSuccess, sendError } = require("../utils/response");
 
-// ─── GET ALL STUDENTS ────────────────────────────────
 const getAllStudents = async (req, res, next) => {
   try {
-    const students = await prisma.student.findMany({
-      include: {
-        // include fetches the related User data alongside each student
-        user: {
-          // select means only return these specific fields from User
-          // we never want password coming back in any response
-          select: { name: true, email: true, role: true },
-        },
-      },
-    });
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    const search = req.query.search || "";
 
-    res.json({ count: students.length, students });
+    // Build the where clause dynamically
+    // If search is provided, filter by name or email
+    const where = search
+      ? {
+          user: {
+            OR: [
+              { name: { contains: search, mode: "insensitive" } },
+              { email: { contains: search, mode: "insensitive" } },
+            ],
+          },
+        }
+      : {};
+
+    const [students, total] = await Promise.all([
+      prisma.student.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          user: { select: { name: true, email: true, role: true } },
+        },
+        orderBy: { id: "asc" },
+      }),
+      prisma.student.count({ where }),
+    ]);
+
+    return sendSuccess(res, "Students retrieved successfully", {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      students,
+    });
   } catch (err) {
     next(err);
   }
 };
-
-// ─── GET STUDENT BY ID ───────────────────────────────
 const getStudentById = async (req, res, next) => {
   try {
     const { id } = req.params;
-
     const student = await prisma.student.findUnique({
       where: { id: Number(id) },
       include: {
         user: { select: { name: true, email: true } },
-        // fetch all courses this student is enrolled in
-        enrollments: {
-          include: { course: true },
-        },
-        // fetch all attendance records for this student
-        attendance: {
-          include: { session: true },
-        },
+        enrollments: { include: { course: true } },
+        attendance: { include: { session: true } },
       },
     });
 
     if (!student) {
-      return res.status(404).json({
-        error: `Student with id ${id} not found`,
-      });
+      return sendError(res, `Student with id ${id} not found`, 404);
     }
 
-    res.json({ student });
+    return sendSuccess(res, "Student retrieved successfully", { student });
   } catch (err) {
     next(err);
   }
 };
 
-// ─── GET STUDENTS BY DEPARTMENT ──────────────────────
 const getStudentsByDepartment = async (req, res, next) => {
   try {
     const { department } = req.params;
-
     const students = await prisma.student.findMany({
       where: {
-        department: {
-          equals: department,
-          mode: "insensitive", // case insensitive — "cs" matches "CS"
-        },
+        department: { equals: department, mode: "insensitive" },
       },
       include: {
         user: { select: { name: true, email: true } },
@@ -70,62 +80,55 @@ const getStudentsByDepartment = async (req, res, next) => {
     });
 
     if (students.length === 0) {
-      return res.status(404).json({
-        error: `No students found in ${department} department`,
-      });
+      return sendError(
+        res,
+        `No students found in ${department} department`,
+        404,
+      );
     }
 
-    res.json({ count: students.length, students });
+    return sendSuccess(res, "Students retrieved successfully", {
+      count: students.length,
+      students,
+    });
   } catch (err) {
     next(err);
   }
 };
 
-// ─── DELETE STUDENT ──────────────────────────────────
 const deleteStudent = async (req, res, next) => {
   try {
     const { id } = req.params;
-
     const student = await prisma.student.findUnique({
       where: { id: Number(id) },
       include: { user: true },
     });
 
     if (!student) {
-      return res.status(404).json({
-        error: `Student with id ${id} not found`,
-      });
+      return sendError(res, `Student with id ${id} not found`, 404);
     }
 
-    // Delete student profile first — then delete the user
-    // Order matters here because User has Student linked to it
-    // Deleting User first would violate the foreign key constraint
     await prisma.student.delete({ where: { id: Number(id) } });
     await prisma.user.delete({ where: { id: student.userId } });
 
-    res.json({ message: `Student ${student.user.name} has been removed` });
+    return sendSuccess(res, `Student ${student.user.name} has been removed`);
   } catch (err) {
     next(err);
   }
 };
 
-// ─── GET ATTENDANCE PERCENTAGE ───────────────────────
 const getAttendancePercentage = async (req, res, next) => {
   try {
     const { id, courseId } = req.params;
 
-    // Count total sessions for this course
     const totalSessions = await prisma.session.count({
       where: { courseId: Number(courseId) },
     });
 
     if (totalSessions === 0) {
-      return res.status(404).json({
-        error: "No sessions found for this course yet",
-      });
+      return sendError(res, "No sessions found for this course yet", 404);
     }
 
-    // Count how many sessions this student attended
     const attended = await prisma.attendance.count({
       where: {
         studentId: Number(id),
@@ -134,10 +137,9 @@ const getAttendancePercentage = async (req, res, next) => {
       },
     });
 
-    // Calculate percentage and round to 1 decimal place
     const percentage = ((attended / totalSessions) * 100).toFixed(1);
 
-    res.json({
+    return sendSuccess(res, "Attendance percentage retrieved", {
       studentId: Number(id),
       courseId: Number(courseId),
       totalSessions,

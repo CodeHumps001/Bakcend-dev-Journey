@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const app = express();
+const { sendError } = require("./utils/response");
 
 // Import all route files
 const authRoutes = require("./routes/authRoutes");
@@ -32,10 +33,27 @@ app.use((req, res) => {
   res.status(404).json({ error: "Route not found" });
 });
 
-// Global error handler — catches any error passed to next(err)
+// Global error handler — must have 4 parameters
 app.use((err, req, res, next) => {
   console.error("Error:", err.message);
-  res.status(500).json({ error: "Something went wrong on the server" });
+
+  // Handle Prisma unique constraint violations
+  // This happens when you try to insert a duplicate unique field
+  if (err.code === "P2002") {
+    return sendError(
+      res,
+      `${err.meta?.target?.[0] || "Field"} already exists`,
+      409,
+    );
+  }
+
+  // Handle Prisma record not found errors
+  if (err.code === "P2025") {
+    return sendError(res, "Record not found", 404);
+  }
+
+  // Generic server error
+  return sendError(res, "Something went wrong on the server", 500, err.message);
 });
 
 const PORT = process.env.PORT || 3000;
